@@ -12,6 +12,10 @@ from faithscore.llava15 import LLaVA
 from faithscore.llama_pre import load_llama, stage1_llama
 from faithscore.utils import llava15, ofa
 import nltk
+from llava.model.builder import load_pretrained_model
+from llava.mm_utils import get_model_name_from_path
+from llava.eval.run_llava import eval_model
+from llava_infrence import get_infrence
 
 
 path = os.path.dirname(__file__)
@@ -144,28 +148,6 @@ class FaithScore():
         return hallucinations, Entities, Relations, Colors, Counting, Others
 
     def stage3(self, atomic_facts, images, img_path=None):
-        # ofa_pipe = pipeline(Tasks.visual_entailment, model='damo/ofa_visual-entailment_snli-ve_large_en')
-        # model = pipeline(Tasks.visual_entailment, model=self.vem_path)
-        if self.model_type == "ofa_ve":
-            model = pipeline(Tasks.visual_entailment, model='damo/ofa_visual-entailment_snli-ve_large_en')
-
-        if self.model_type == "ofa":
-            preprocessor = OfaPreprocessor(model_dir="damo/ofa_visual-question-answering_pretrain_large_en")
-            model = pipeline(
-                Tasks.visual_question_answering,
-                model="damo/ofa_visual-question-answering_pretrain_large_en",
-                model_revision='v1.0.1',
-                preprocessor=preprocessor)
-
-        if self.model_type == "llava":
-            if not self.llava_path:
-                print("Please input path for LLaVA model.")
-                exit()
-            model = LLaVA()
-        # if self.model_type == "mplug":
-        #     output = mplug(image, prompt, model)
-        # if self.model_type == "blip2":
-        #     output = blip_2(image, prompt, model, vis_processors_blip_2)
 
         fact_scores = []
         for id, elements in enumerate(tqdm(atomic_facts)):
@@ -178,17 +160,7 @@ class FaithScore():
             for element in elements:
                 # input = {'image': image, 'text': element}
                 prompt = 'Statement: ' + element + ' Is this statement is right according to the image? Please answer yes or no.'
-                if self.model_type == "ofa_ve":
-                    output = ofa(True, model, element, image)
-                if self.model_type == "ofa":
-                    output = ofa(False, model, prompt, image)
-                if self.model_type == "llava":
-                    output = llava15(image, prompt, model)
-                # print(output)
-                # if self.model_type == "mplug":
-                #     output = mplug(image, prompt, model)
-                # if self.model_type == "blip2":
-                #     output = blip_2(image, prompt, model, vis_processors_blip_2)
+                output = get_infrence(prompt, image)
 
                 # output = ofa_pipe(input)[0]
                 if "yes" in output.lower():
@@ -196,14 +168,7 @@ class FaithScore():
                 else:
                     fact_score.append(0)
 
-                # if output.lower() == "yes" or output== "Yes":
-                #     fact_score.append(1)
-                # else:
-                #     fact_score.append(0)
             fact_scores.append(fact_score)
-                # result.append(output[OutputKeys.LABELS])
-            # results.append({"image": images_id[id], "facts": elements, "result": str(result)})
-            # checking_results.append(result)
 
         instance_score = [sum(ii) / len(ii) if len(ii) > 0 else 0 for ii in fact_scores]
         # print("Overall score: ", sum(instance_score) / len(instance_score))
